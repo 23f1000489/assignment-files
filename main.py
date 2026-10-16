@@ -64,20 +64,25 @@ def coerce(key: str, value):
 # 5. CLI/query-parameter overrides: highest precedence
 @app.get("/effective-config")
 def effective_config(set: list[str] = Query(default=[])):
+    # Start fresh for EVERY request.
+    # Never change the shared "config" dictionary here.
+    request_config = config.copy()
+
+    # Apply overrides only to this request's copy.
     for item in set:
         if "=" not in item:
             continue
 
         key, value = item.split("=", 1)
-        config[key.strip().lower()] = value
+        request_config[key.strip().lower()] = value
 
-    # Coerce AFTER merging every layer.
-    final_config = {
-        "port": coerce("port", config["port"]),
-        "workers": coerce("workers", config["workers"]),
-        "debug": coerce("debug", config["debug"]),
-        "log_level": coerce("log_level", config["log_level"]),
-        "api_key": "****",
+    # Convert all values to their required types.
+    result = {
+        key: coerce(key, value)
+        for key, value in request_config.items()
     }
 
-    return final_config
+    # Always hide the secret, with no spaces.
+    result["api_key"] = "****"
+
+    return result
